@@ -206,7 +206,13 @@ class MainActivity : Activity() {
         executeNativeTask(
             "Checking native runtime in background…",
             { source -> nativeRun(source) },
-            { "Native runtime not integrated • See output" }
+            { result ->
+                when {
+                    result.startsWith("NATIVE ARMv7 RUN: SUCCESS") -> "Native ARMv7 execution succeeded"
+                    result.startsWith("NATIVE ARMv7 RUN: FAILED") -> "Native execution failed • See output"
+                    else -> "LLVM runtime unavailable • See output"
+                }
+            }
         )
     }
 
