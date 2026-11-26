@@ -42,9 +42,27 @@ jobs:
           yes | sdkmanager --licenses
           sdkmanager "ndk;27.2.12479018" "cmake;3.22.1"
 
+      # Cache the LLVM source and both CMake/Ninja build trees. This lets later
+      # runs reuse compiled ARM objects instead of rebuilding LLVM from scratch.
+      - name: Restore LLVM cross-build cache
+        uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4
+        with:
+          path: |
+            llvm-project
+            llvm-host
+            llvm-android
+          key: ${{ runner.os }}-llvm-18.1.8-armv7-v2-${{ hashFiles('.github/workflows/android-apk.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-llvm-18.1.8-armv7-v2-
+
       - name: Fetch LLVM 18.1.8
         run: |
-          git clone --depth 1 --branch llvmorg-18.1.8 https://github.com/llvm/llvm-project.git llvm-project
+          if [ ! -d llvm-project/.git ]; then
+            rm -rf llvm-project
+            git clone --depth 1 --branch llvmorg-18.1.8 https://github.com/llvm/llvm-project.git llvm-project
+          else
+            echo "Using cached LLVM 18.1.8 source tree"
+          fi
 
       - name: Build only required LLVM host table generators
         run: |
