@@ -12,7 +12,7 @@ permissions:
 
 concurrency:
   group: kx-armv7-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -46,7 +46,7 @@ jobs:
         run: |
           git clone --depth 1 --branch llvmorg-18.1.8 https://github.com/llvm/llvm-project.git llvm-project
 
-      - name: Build LLVM host tools and LLD
+      - name: Build only required LLVM host table generators
         run: |
           cmake -S llvm-project/llvm -B llvm-host -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
@@ -60,9 +60,9 @@ jobs:
             -DLLVM_ENABLE_TERMINFO=OFF \
             -DLLVM_ENABLE_ZLIB=OFF \
             -DLLVM_ENABLE_ZSTD=OFF
-          cmake --build llvm-host --target llvm-tblgen clang lld --parallel 2
-          test -x llvm-host/bin/clang
-          test -x llvm-host/bin/ld.lld
+          cmake --build llvm-host --target llvm-tblgen clang-tblgen --parallel "$(nproc)"
+          test -x llvm-host/bin/llvm-tblgen
+          test -x llvm-host/bin/clang-tblgen
 
       - name: Cross-build LLVM ARM backend for Android armeabi-v7a
         run: |
@@ -81,6 +81,7 @@ jobs:
             -DLLVM_DYLIB_COMPONENTS=all \
             -DLLVM_TABLEGEN="$PWD/llvm-host/bin/llvm-tblgen" \
             -DLLVM_NATIVE_TOOL_DIR="$PWD/llvm-host/bin" \
+            -DCLANG_TABLEGEN="$PWD/llvm-host/bin/clang-tblgen" \
             -DLLVM_INCLUDE_TESTS=OFF \
             -DLLVM_INCLUDE_EXAMPLES=OFF \
             -DLLVM_INCLUDE_BENCHMARKS=OFF \
@@ -90,7 +91,7 @@ jobs:
             -DLLVM_ENABLE_LIBXML2=OFF \
             -DLLVM_ENABLE_BINDINGS=OFF \
             -DLLVM_ENABLE_ASSERTIONS=OFF
-          cmake --build llvm-android --target LLVM clang clang-resource-headers lld --parallel 2
+          cmake --build llvm-android --target LLVM clang clang-resource-headers lld --parallel "$(nproc)"
           test -x llvm-android/bin/clang
           test -x llvm-android/bin/ld.lld
           llvm-android/bin/clang --version
@@ -105,7 +106,6 @@ jobs:
           cp "llvm-android/lib/libLLVM.so" "app/src/main/jniLibs/armeabi-v7a/$SONAME"
           echo "LLVM shared-library SONAME: $SONAME"
           mkdir -p app/src/main/assets/toolchain
-          cp llvm-host/bin/ld.lld app/src/main/assets/toolchain/ld.lld-linux-x86_64
           cp llvm-android/bin/ld.lld app/src/main/assets/toolchain/ld.lld-android-armv7
           cp llvm-android/bin/clang app/src/main/assets/toolchain/clang-android-armv7
           cp -R llvm-project/clang/lib/Headers app/src/main/assets/toolchain/clang-headers
