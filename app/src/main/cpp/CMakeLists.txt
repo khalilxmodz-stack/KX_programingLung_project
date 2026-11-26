@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 3.22.1)
+project(kxstudio LANGUAGES CXX)
+add_library(kxstudio SHARED native-lib.cpp)
+target_compile_features(kxstudio PRIVATE cxx_std_17)
+target_compile_options(kxstudio PRIVATE -Wall -Wextra -Wpedantic)
