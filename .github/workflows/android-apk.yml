@@ -75,7 +75,7 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INSTALL_PREFIX="$PWD/llvm-install" \
             -DLLVM_TARGETS_TO_BUILD=ARM \
-            -DLLVM_ENABLE_PROJECTS=lld \
+            -DLLVM_ENABLE_PROJECTS="clang;lld" \
             -DLLVM_BUILD_LLVM_DYLIB=ON \
             -DLLVM_LINK_LLVM_DYLIB=ON \
             -DLLVM_DYLIB_COMPONENTS=all \
@@ -90,9 +90,11 @@ jobs:
             -DLLVM_ENABLE_LIBXML2=OFF \
             -DLLVM_ENABLE_BINDINGS=OFF \
             -DLLVM_ENABLE_ASSERTIONS=OFF
-          cmake --build llvm-android --target LLVM clang lld --parallel 2
-          test -f llvm-android/bin/clang
-          test -f llvm-android/bin/ld.lld
+          cmake --build llvm-android --target LLVM clang clang-resource-headers lld --parallel 2
+          test -x llvm-android/bin/clang
+          test -x llvm-android/bin/ld.lld
+          llvm-android/bin/clang --version
+          llvm-android/bin/ld.lld --version
           mkdir -p app/src/main/jniLibs/armeabi-v7a app/src/main/cpp/llvm-include
           cp llvm-android/lib/libLLVM.so app/src/main/jniLibs/armeabi-v7a/libLLVM.so
           cp -R llvm-project/llvm/include/llvm-c app/src/main/cpp/llvm-include/
@@ -107,6 +109,8 @@ jobs:
           cp llvm-android/bin/ld.lld app/src/main/assets/toolchain/ld.lld-android-armv7
           cp llvm-android/bin/clang app/src/main/assets/toolchain/clang-android-armv7
           cp -R llvm-project/clang/lib/Headers app/src/main/assets/toolchain/clang-headers
+          mkdir -p app/src/main/assets/toolchain/clang-resource/include
+          cp -R llvm-project/clang/lib/Headers/. app/src/main/assets/toolchain/clang-resource/include/
           chmod 644 app/src/main/assets/toolchain/ld.lld-* app/src/main/assets/toolchain/clang-*
 
       - name: Build ARMv7 debug APK with LLVM MCJIT
