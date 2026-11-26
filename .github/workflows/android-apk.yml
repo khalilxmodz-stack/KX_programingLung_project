@@ -88,7 +88,7 @@ jobs:
           cp -R llvm-project/llvm/include/llvm-c app/src/main/cpp/llvm-include/
           mkdir -p app/src/main/cpp/llvm-include/llvm
           cp -R llvm-android/include/llvm/Config app/src/main/cpp/llvm-include/llvm/
-          SONAME="$(readelf -d llvm-android/lib/libLLVM.so | awk -F\x27[][]\x27 '/SONAME/ {print $2}')"
+          SONAME="$(readelf -d llvm-android/lib/libLLVM.so | grep -o 'SONAME.*' | cut -d '[' -f2 | cut -d ']' -f1)"
           test -n "$SONAME"
           cp "llvm-android/lib/libLLVM.so" "app/src/main/jniLibs/armeabi-v7a/$SONAME"
           echo "LLVM shared-library SONAME: $SONAME"
