@@ -3,6 +3,8 @@ name: Build KX Studio APK
 on:
   workflow_dispatch:
   push:
+    branches: [ main, master, development/armv7-native-foundation ]
+  pull_request:
     branches: [ main, master ]
 
 permissions:
@@ -30,11 +32,19 @@ jobs:
         uses: android-actions/setup-android@v3
         with:
           packages: platform-tools
+
       - name: Install Android NDK and CMake
-        run: sdkmanager "ndk;27.2.12479018" "cmake;3.22.1"
+        run: |
+          yes | sdkmanager --licenses
+          sdkmanager "ndk;27.2.12479018" "cmake;3.22.1"
 
       - name: Build ARMv7 debug APK
         run: gradle --no-daemon assembleDebug
+
+      - name: Verify ARMv7 native library is packaged
+        run: |
+          APK="app/build/outputs/apk/debug/app-debug.apk"
+          unzip -Z1 "$APK" | grep -Fx "lib/armeabi-v7a/libkxstudio.so"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
@@ -43,4 +53,3 @@ jobs:
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
-          
