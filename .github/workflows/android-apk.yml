@@ -3,7 +3,7 @@ name: Build KX Studio ARMv7 APK with LLVM
 on:
   workflow_dispatch:
   push:
-    branches: [ main, master, development/armv7-native-foundation ]
+    branches: [ main, master, development/armv7-native-foundation, feature/vscode-like-landscape-editor ]
   pull_request:
     branches: [ main, master ]
 
@@ -12,7 +12,7 @@ permissions:
 
 concurrency:
   group: kx-armv7-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -42,11 +42,31 @@ jobs:
           yes | sdkmanager --licenses
           sdkmanager "ndk;27.2.12479018" "cmake;3.22.1"
 
-      - name: Fetch LLVM 18.1.8
-        run: |
-          git clone --depth 1 --branch llvmorg-18.1.8 https://github.com/llvm/llvm-project.git llvm-project
+      # Cache the LLVM source and both CMake/Ninja build trees. This lets later
+      # runs reuse compiled ARM objects instead of rebuilding LLVM from scratch.
+      - name: Restore LLVM cross-build cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            llvm-project
+            llvm-host
+            llvm-android
+          key: ${{ runner.os }}-llvm-18.1.8-armv7-sparse-v3-${{ hashFiles('.github/workflows/android-apk.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-llvm-18.1.8-armv7-sparse-v3-
 
-      - name: Build LLVM host tools and LLD
+      - name: Fetch only required LLVM source directories
+        run: |
+          if [ ! -d llvm-project/.git ]; then
+            rm -rf llvm-project
+            git clone --depth 1 --filter=blob:none --sparse --branch llvmorg-18.1.8 https://github.com/llvm/llvm-project.git llvm-project
+            git -C llvm-project sparse-checkout set llvm clang lld cmake third-party
+          else
+            echo "Using cached sparse LLVM 18.1.8 source tree"
+            git -C llvm-project sparse-checkout set llvm clang lld cmake third-party
+          fi
+
+      - name: Build only required LLVM host table generators
         run: |
           cmake -S llvm-project/llvm -B llvm-host -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
@@ -60,9 +80,9 @@ jobs:
             -DLLVM_ENABLE_TERMINFO=OFF \
             -DLLVM_ENABLE_ZLIB=OFF \
             -DLLVM_ENABLE_ZSTD=OFF
-          cmake --build llvm-host --target llvm-tblgen clang lld --parallel 2
-          test -x llvm-host/bin/clang
-          test -x llvm-host/bin/ld.lld
+          cmake --build llvm-host --target llvm-tblgen clang-tblgen --parallel "$(nproc)"
+          test -x llvm-host/bin/llvm-tblgen
+          test -x llvm-host/bin/clang-tblgen
 
       - name: Cross-build LLVM ARM backend for Android armeabi-v7a
         run: |
@@ -81,6 +101,7 @@ jobs:
             -DLLVM_DYLIB_COMPONENTS=all \
             -DLLVM_TABLEGEN="$PWD/llvm-host/bin/llvm-tblgen" \
             -DLLVM_NATIVE_TOOL_DIR="$PWD/llvm-host/bin" \
+            -DCLANG_TABLEGEN="$PWD/llvm-host/bin/clang-tblgen" \
             -DLLVM_INCLUDE_TESTS=OFF \
             -DLLVM_INCLUDE_EXAMPLES=OFF \
             -DLLVM_INCLUDE_BENCHMARKS=OFF \
@@ -90,7 +111,7 @@ jobs:
             -DLLVM_ENABLE_LIBXML2=OFF \
             -DLLVM_ENABLE_BINDINGS=OFF \
             -DLLVM_ENABLE_ASSERTIONS=OFF
-          cmake --build llvm-android --target LLVM clang clang-resource-headers lld --parallel 2
+          cmake --build llvm-android --target LLVM clang clang-resource-headers lld --parallel "$(nproc)"
           test -x llvm-android/bin/clang
           test -x llvm-android/bin/ld.lld
           llvm-android/bin/clang --version
@@ -105,10 +126,9 @@ jobs:
           cp "llvm-android/lib/libLLVM.so" "app/src/main/jniLibs/armeabi-v7a/$SONAME"
           echo "LLVM shared-library SONAME: $SONAME"
           mkdir -p app/src/main/assets/toolchain
-          cp llvm-host/bin/ld.lld app/src/main/assets/toolchain/ld.lld-linux-x86_64
           cp llvm-android/bin/ld.lld app/src/main/assets/toolchain/ld.lld-android-armv7
           cp llvm-android/bin/clang app/src/main/assets/toolchain/clang-android-armv7
-          cp -R llvm-project/clang/lib/Headers app/src/main/assets/toolchain/clang-headers
+          # Keep one copy of Clang builtin headers; avoid duplicating them in the APK.
           mkdir -p app/src/main/assets/toolchain/clang-resource/include
           cp -R llvm-project/clang/lib/Headers/. app/src/main/assets/toolchain/clang-resource/include/
           chmod 644 app/src/main/assets/toolchain/ld.lld-* app/src/main/assets/toolchain/clang-*
