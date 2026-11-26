@@ -66,13 +66,13 @@ Java_com_khalilxmodz_kxstudio_MainActivity_nativeRun(
     const std::string source = fromJString(env, sourceValue);
     const kx::CompileResult compilation = kx::Compiler{}.compileSource(source, androidOptions());
     if (!compilation.success) {
-        return toJString(env, "COMPILE FAILED\\n" +
+        return toJString(env, "COMPILE FAILED\n" +
             kx::DiagnosticsAPI::formatAll(compilation.diagnostics));
     }
 
     const kx::NativeExecutionResult execution = kx::executeLLVMIR(compilation.llvmIR);
     std::ostringstream out;
-    out << (execution.success ? "NATIVE ARMv7 RUN: SUCCESS\\n" : "NATIVE ARMv7 RUN: FAILED\\n");
+    out << (execution.success ? "NATIVE ARMv7 RUN: SUCCESS\n" : "NATIVE ARMv7 RUN: FAILED\n");
     out << execution.output;
     return toJString(env, out.str());
 }
