@@ -1,4 +1,4 @@
-name: Build KX Studio APK
+name: Build KX Studio ARMv7 APK with LLVM
 
 on:
   workflow_dispatch:
@@ -14,7 +14,7 @@ jobs:
   build:
     runs-on: ubuntu-24.04
     steps:
-      - name: Checkout source
+      - name: Checkout KX Studio
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Set up Java 17
@@ -38,18 +38,69 @@ jobs:
           yes | sdkmanager --licenses
           sdkmanager "ndk;27.2.12479018" "cmake;3.22.1"
 
-      - name: Build ARMv7 debug APK
+      - name: Fetch LLVM 18.1.8
+        run: |
+          git clone --depth 1 --branch llvmorg-18.1.8 https://github.com/llvm/llvm-project.git llvm-project
+
+      - name: Build LLVM host tablegen
+        run: |
+          cmake -S llvm-project/llvm -B llvm-host -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DLLVM_TARGETS_TO_BUILD=ARM \
+            -DLLVM_BUILD_TOOLS=ON \
+            -DLLVM_BUILD_UTILS=ON \
+            -DLLVM_INCLUDE_TESTS=OFF \
+            -DLLVM_INCLUDE_EXAMPLES=OFF \
+            -DLLVM_INCLUDE_BENCHMARKS=OFF \
+            -DLLVM_ENABLE_TERMINFO=OFF \
+            -DLLVM_ENABLE_ZLIB=OFF \
+            -DLLVM_ENABLE_ZSTD=OFF
+          cmake --build llvm-host --target llvm-tblgen --parallel 2
+
+      - name: Cross-build LLVM ARM backend for Android armeabi-v7a
+        env:
+          ANDROID_NDK_HOME: ${{ env.ANDROID_NDK_HOME }}
+        run: |
+          cmake -S llvm-project/llvm -B llvm-android -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake" \
+            -DANDROID_ABI=armeabi-v7a \
+            -DANDROID_PLATFORM=24 \
+            -DCMAKE_ANDROID_STL_TYPE=c++_shared \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="$PWD/llvm-install" \
+            -DLLVM_TARGETS_TO_BUILD=ARM \
+            -DLLVM_BUILD_LLVM_DYLIB=ON \
+            -DLLVM_LINK_LLVM_DYLIB=ON \
+            -DLLVM_DYLIB_COMPONENTS=all \
+            -DLLVM_TABLEGEN="$PWD/llvm-host/bin/llvm-tblgen" \
+            -DLLVM_NATIVE_TOOL_DIR="$PWD/llvm-host/bin" \
+            -DLLVM_INCLUDE_TESTS=OFF \
+            -DLLVM_INCLUDE_EXAMPLES=OFF \
+            -DLLVM_INCLUDE_BENCHMARKS=OFF \
+            -DLLVM_ENABLE_TERMINFO=OFF \
+            -DLLVM_ENABLE_ZLIB=OFF \
+            -DLLVM_ENABLE_ZSTD=OFF \
+            -DLLVM_ENABLE_LIBXML2=OFF \
+            -DLLVM_ENABLE_BINDINGS=OFF \
+            -DLLVM_ENABLE_ASSERTIONS=OFF
+          cmake --build llvm-android --target LLVM --parallel 2
+          mkdir -p app/src/main/jniLibs/armeabi-v7a app/src/main/cpp/llvm-include
+          cp llvm-android/lib/libLLVM.so app/src/main/jniLibs/armeabi-v7a/libLLVM.so
+          cp -R llvm-project/llvm/include/llvm-c app/src/main/cpp/llvm-include/
+
+      - name: Build ARMv7 debug APK with LLVM MCJIT
         run: gradle --no-daemon assembleDebug
 
-      - name: Verify ARMv7 native library is packaged
+      - name: Verify LLVM and KX native libraries are packaged
         run: |
           APK="app/build/outputs/apk/debug/app-debug.apk"
           unzip -Z1 "$APK" | grep -Fx "lib/armeabi-v7a/libkxstudio.so"
+          unzip -Z1 "$APK" | grep -Fx "lib/armeabi-v7a/libLLVM.so"
 
       - name: Upload APK
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: KX-Studio-ARMv7-debug
+          name: KX-Studio-ARMv7-LLVM-debug
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
