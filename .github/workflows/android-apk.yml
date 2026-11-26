@@ -51,7 +51,7 @@ jobs:
           cmake -S llvm-project/llvm -B llvm-host -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
             -DLLVM_TARGETS_TO_BUILD=ARM \
-            -DLLVM_ENABLE_PROJECTS=clang;lld \
+            -DLLVM_ENABLE_PROJECTS="clang;lld" \
             -DLLVM_BUILD_TOOLS=ON \
             -DLLVM_BUILD_UTILS=ON \
             -DLLVM_INCLUDE_TESTS=OFF \
