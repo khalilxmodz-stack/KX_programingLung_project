@@ -117,6 +117,8 @@ jobs:
           APK="app/build/outputs/apk/debug/app-debug.apk"
           unzip -Z1 "$APK" | grep -Fx "lib/armeabi-v7a/libkxstudio.so"
           unzip -Z1 "$APK" | grep -Fx "lib/armeabi-v7a/libLLVM.so"
+          unzip -Z1 "$APK" | grep -Fx "assets/toolchain/ld.lld-android-armv7"
+          unzip -Z1 "$APK" | grep -Fx "assets/toolchain/clang-android-armv7"
 
       - name: Upload APK
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
