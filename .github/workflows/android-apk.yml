@@ -3,7 +3,7 @@ name: Build KX Studio ARMv7 APK with LLVM
 on:
   workflow_dispatch:
   push:
-    branches: [ main, master, development/armv7-native-foundation ]
+    branches: [ main, master, development/armv7-native-foundation, feature/vscode-like-landscape-editor ]
   pull_request:
     branches: [ main, master ]
 
