@@ -51,9 +51,9 @@ jobs:
             llvm-project
             llvm-host
             llvm-android
-          key: ${{ runner.os }}-llvm-18.1.8-armv7-v2-${{ hashFiles('.github/workflows/android-apk.yml') }}
+          key: ${{ runner.os }}-llvm-18.1.8-armv7-sparse-v3-${{ hashFiles('.github/workflows/android-apk.yml') }}
           restore-keys: |
-            ${{ runner.os }}-llvm-18.1.8-armv7-v2-
+            ${{ runner.os }}-llvm-18.1.8-armv7-sparse-v3-
 
       - name: Fetch only required LLVM source directories
         run: |
