@@ -51,7 +51,7 @@ jobs:
           cmake -S llvm-project/llvm -B llvm-host -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
             -DLLVM_TARGETS_TO_BUILD=ARM \
-            -DLLVM_ENABLE_PROJECTS=lld \
+            -DLLVM_ENABLE_PROJECTS=clang;lld \
             -DLLVM_BUILD_TOOLS=ON \
             -DLLVM_BUILD_UTILS=ON \
             -DLLVM_INCLUDE_TESTS=OFF \
@@ -60,7 +60,8 @@ jobs:
             -DLLVM_ENABLE_TERMINFO=OFF \
             -DLLVM_ENABLE_ZLIB=OFF \
             -DLLVM_ENABLE_ZSTD=OFF
-          cmake --build llvm-host --target llvm-tblgen lld --parallel 2
+          cmake --build llvm-host --target llvm-tblgen clang lld --parallel 2
+          test -x llvm-host/bin/clang
           test -x llvm-host/bin/ld.lld
 
       - name: Cross-build LLVM ARM backend for Android armeabi-v7a
@@ -89,7 +90,8 @@ jobs:
             -DLLVM_ENABLE_LIBXML2=OFF \
             -DLLVM_ENABLE_BINDINGS=OFF \
             -DLLVM_ENABLE_ASSERTIONS=OFF
-          cmake --build llvm-android --target LLVM lld --parallel 2
+          cmake --build llvm-android --target LLVM clang lld --parallel 2
+          test -f llvm-android/bin/clang
           test -f llvm-android/bin/ld.lld
           mkdir -p app/src/main/jniLibs/armeabi-v7a app/src/main/cpp/llvm-include
           cp llvm-android/lib/libLLVM.so app/src/main/jniLibs/armeabi-v7a/libLLVM.so
@@ -103,7 +105,9 @@ jobs:
           mkdir -p app/src/main/assets/toolchain
           cp llvm-host/bin/ld.lld app/src/main/assets/toolchain/ld.lld-linux-x86_64
           cp llvm-android/bin/ld.lld app/src/main/assets/toolchain/ld.lld-android-armv7
-          chmod 644 app/src/main/assets/toolchain/ld.lld-*
+          cp llvm-android/bin/clang app/src/main/assets/toolchain/clang-android-armv7
+          cp -R llvm-project/clang/lib/Headers app/src/main/assets/toolchain/clang-headers
+          chmod 644 app/src/main/assets/toolchain/ld.lld-* app/src/main/assets/toolchain/clang-*
 
       - name: Build ARMv7 debug APK with LLVM MCJIT
         run: gradle --no-daemon assembleDebug
