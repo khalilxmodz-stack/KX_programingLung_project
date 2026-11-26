@@ -2,6 +2,7 @@
 #include <sstream>
 #include <string>
 #include "kxcompiler/kx_compiler_api.hpp"
+#include "kx_llvm_jit.hpp"
 
 namespace {
 std::string fromJString(JNIEnv* env, jstring value) {
@@ -61,14 +62,17 @@ Java_com_khalilxmodz_kxstudio_MainActivity_nativeCompile(
 
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_khalilxmodz_kxstudio_MainActivity_nativeRun(
-    JNIEnv* env, jobject, jstring) {
-    // Deliberately fail closed: KX v0.21 emits LLVM IR, but does not include
-    // an in-process Android ARM native-code generator or execution host.
-    return toJString(env,
-        "NATIVE RUNTIME NOT AVAILABLE\n\n"
-        "The source can be compiled to validated LLVM IR, but this build does "
-        "not yet contain the native ARMv7 code generator, linker, or runtime "
-        "loader required to execute KX programs on Android.\n\n"
-        "No Preview VM or interpreter is used. Run is intentionally blocked "
-        "until the real native runtime is integrated.");
+    JNIEnv* env, jobject, jstring sourceValue) {
+    const std::string source = fromJString(env, sourceValue);
+    const kx::CompileResult compilation = kx::Compiler{}.compileSource(source, androidOptions());
+    if (!compilation.success) {
+        return toJString(env, "COMPILE FAILED\\n" +
+            kx::DiagnosticsAPI::formatAll(compilation.diagnostics));
+    }
+
+    const kx::NativeExecutionResult execution = kx::executeLLVMIR(compilation.llvmIR);
+    std::ostringstream out;
+    out << (execution.success ? "NATIVE ARMv7 RUN: SUCCESS\\n" : "NATIVE ARMv7 RUN: FAILED\\n");
+    out << execution.output;
+    return toJString(env, out.str());
 }
