@@ -1,0 +1,6 @@
+fn main() -> i32 {
+    i32 x = 40;
+    i32 y = 2;
+    print(x + y);
+    return 0;
+}
